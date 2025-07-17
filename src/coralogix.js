@@ -68,9 +68,7 @@ export class CoralogixLogger {
         body: JSON.stringify(payload),
       }));
       return resp;
-    }
-    /* c8 ignore start */
-    finally {
+    } finally {
       await fetchContext.reset();
     }
     /* c8 ignore end */
@@ -97,18 +95,19 @@ export class CoralogixLogger {
   async sendEntries(entries) {
     const logEntries = entries
       .map(({ timestamp, extractedFields, message }) => {
-        let level, messageText;
-        
+        let level;
+        let messageText;
+
         // Handle new Step Function format: timestamp on first line, JSON on subsequent lines
         if (message) {
-          const lines = message.split('\n').filter(line => line.trim());
+          const lines = message.split('\n').filter((line) => line.trim());
           if (lines.length >= 2) {
             // Check if first line is a timestamp and second line starts with {
             const firstLine = lines[0].trim();
             const secondLine = lines[1].trim();
-            
-            if (firstLine.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/) && 
-                secondLine.startsWith('{')) {
+
+            if (firstLine.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+                && secondLine.startsWith('{')) {
               // This is the new Step Function format
               level = 'INFO';
               messageText = message;
@@ -132,7 +131,7 @@ export class CoralogixLogger {
             }
           }
         }
-        
+
         // Handle existing Lambda format with extractedFields.event
         if (extractedFields?.event) {
           const parts = extractedFields.event.split('\t');
@@ -147,7 +146,7 @@ export class CoralogixLogger {
           level = 'INFO';
           messageText = 'Unknown log format';
         }
-        
+
         const text = {
           inv: {
             invocationId: extractedFields?.request_id || 'n/a',
