@@ -9,9 +9,17 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-// eslint-disable-next-line no-console
-console.log('Forcing HTTP/1.1 for @adobe/fetch');
-process.env.HELIX_FETCH_FORCE_HTTP1 = 'true';
+import { context, ALPN_HTTP1_1 } from '@adobe/fetch';
 
-// eslint-disable-next-line no-underscore-dangle
-global.__rootdir = new URL('../', import.meta.url).pathname;
+/**
+ * Our global fetch context that limits the number of sockets used.
+ */
+export const fetchContext = context({
+  maxCacheSize: 0,
+  alpnProtocols: [ALPN_HTTP1_1],
+  h1: { maxSockets: 512, maxTotalSockets: 768, keepAlive: true },
+});
+
+const { reset } = fetchContext;
+
+export const resetConnections = async () => reset();

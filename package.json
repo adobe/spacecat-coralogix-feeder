@@ -2,73 +2,89 @@
   "name": "@adobe/spacecat-coralogix-feeder",
   "version": "1.0.0",
   "private": true,
-  "description": "Franklin Coralogix Feeder",
+  "description": "Spacecat Coralogix Feeder",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
+    "start": "nodemon",
     "test": "c8 mocha  -i -g 'Post-Deploy' --spec=test/**/*.test.js",
     "test-postdeploy": "mocha -g 'Post-Deploy' --spec=test/**/*.test.js",
     "lint": "eslint .",
     "semantic-release": "semantic-release",
     "commit": "git-cz",
-    "build": "hedy -v",
-    "deploy": "hedy -v --deploy --test --aws-region us-east-1",
+    "build": "hedy -v --test-bundle",
+    "deploy": "hedy -v --deploy --test --cleanup-patch=1w",
     "deploy-routes": "hedy --no-build --no-hints -l major",
-    "deploy-ci": "hedy -v --deploy --test --pkgVersion=ci$CIRCLE_BUILD_NUM -l ci --cleanup-ci 24h",
-    "prepare": "husky install"
+    "deploy-ci": "hedy -v --deploy --test --pkgVersion=ci$CIRCLE_BUILD_NUM -l ci --cleanup-ci 48h",
+    "prepare": "husky"
   },
   "wsk": {
-    "nodeVersion": 18,
     "target": "aws",
     "name": "spacecat-services/coralogix-feeder@${version}",
-    "awsRole!important": "arn:aws:iam::282898975672:role/spacecat-role-services",
-    "testUrl": "/_status_check/healthcheck.json",
     "memory": 1024,
-    "fastlyServiceId!important": ""
+    "testUrl": "/_status_check/healthcheck.json",
+    "awsAttachAuthorizer": "helix-token-authorizer_v2",
+    "fastlyServiceId!important": "",
+    "nodeVersion": 22
   },
   "mocha": {
-    "require": "test/setup-env.js",
+    "require": [
+      "test/setup-env.js",
+      "mocha-suppress-logs"
+    ],
     "recursive": "true",
     "reporter": "mocha-multi-reporters",
     "reporter-options": "configFile=.mocha-multi.json"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/adobe-rnd/spacecat-coralogix-feeder"
+    "url": "https://github.com/adobe/spacecat-coralogix-feeder"
   },
   "author": "",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/adobe-rnd/spacecat-coralogix-feeder/issues"
+    "url": "https://github.com/adobe/spacecat-coralogix-feeder/issues"
   },
-  "homepage": "https://github.com/adobe-rnd/spacecat-coralogix-feeder#readme",
+  "homepage": "https://github.com/adobe/spacecat-coralogix-feeder#readme",
   "dependencies": {
-    "@adobe/fetch": "4.1.1",
-    "@adobe/helix-shared-wrap": "2.0.0",
-    "@adobe/helix-status": "10.0.11",
-    "aws4": "1.12.0"
+    "@adobe/fetch": "4.2.3",
+    "@adobe/helix-shared-wrap": "2.0.2",
+    "@adobe/helix-status": "10.1.5",
+    "aws4": "1.13.2",
+    "fetch-retry": "6.0.0"
   },
   "devDependencies": {
-    "@adobe/eslint-config-helix": "2.0.5",
-    "@adobe/helix-deploy": "9.4.3",
-    "@adobe/helix-universal": "4.4.1",
-    "@adobe/semantic-release-coralogix": "1.1.27",
+    "@adobe/eslint-config-helix": "3.0.12",
+    "@adobe/helix-deploy": "13.1.19",
+    "@adobe/helix-universal": "5.2.3",
+    "@adobe/helix-universal-devserver": "1.1.141",
+    "@adobe/semantic-release-coralogix": "1.1.40",
+    "@eslint/config-helpers": "0.4.0",
     "@semantic-release/changelog": "6.0.3",
-    "@semantic-release/exec": "6.0.3",
+    "@semantic-release/exec": "7.1.0",
     "@semantic-release/git": "10.0.1",
-    "c8": "8.0.1",
-    "codecov": "3.8.3",
-    "dotenv": "16.3.1",
-    "eslint": "8.56.0",
-    "husky": "8.0.3",
-    "junit-report-builder": "3.1.0",
-    "lint-staged": "15.2.0",
-    "mocha": "10.2.0",
+    "c8": "10.1.3",
+    "dotenv": "17.2.3",
+    "eslint": "9.4.0",
+    "husky": "9.1.7",
+    "junit-report-builder": "5.1.1",
+    "lint-staged": "16.2.3",
+    "mocha": "11.7.4",
     "mocha-multi-reporters": "1.5.1",
-    "nock": "13.4.0",
-    "semantic-release": "22.0.12"
+    "mocha-suppress-logs": "0.6.0",
+    "nock": "13.5.6",
+    "nodemon": "3.1.10",
+    "semantic-release": "24.2.9"
   },
   "lint-staged": {
     "*.js": "eslint"
+  },
+  "nodemonConfig": {
+    "exec": "node --inspect ./test/dev/server.mjs",
+    "watch": [
+      ".env",
+      "."
+    ],
+    "ext": ".js, .cjs, .ejs, .css"
   }
 }

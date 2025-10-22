@@ -18,8 +18,30 @@ import { CoralogixLogger } from './coralogix.js';
 import { resolve } from './alias.js';
 import { sendToDLQ } from './dlq.js';
 import { mapSubsystem } from './subsystem.js';
+import { resetConnections } from './utils.js';
 
 const gunzip = util.promisify(zlib.gunzip);
+
+/**
+ * Gets input to this function.
+ * @param {Request} request the request object (see fetch api)
+ * @param {UniversalContext} context the context of the universal serverless function
+ * @returns input
+ */
+async function getInput(request, context) {
+  const { invocation: { event } } = context;
+
+  if (event?.awslogs?.data) {
+    const payload = Buffer.from(event.awslogs.data, 'base64');
+    const uncompressed = await gunzip(payload);
+    return JSON.parse(uncompressed.toString());
+  }
+  if (request.method === 'POST' && request.headers.get('content-type') === 'application/json') {
+    const json = await request.json();
+    return json;
+  }
+  return null;
+}
 
 /**
  * This is the main function
@@ -32,19 +54,17 @@ async function run(request, context) {
     invocation: { event },
     env: {
       CORALOGIX_API_KEY: apiKey,
+      CORALOGIX_API_URL: apiUrl,
       CORALOGIX_SUBSYSTEM: defaultSubsystem,
+      CORALOGIX_COMPUTER_NAME: computerName,
       CORALOGIX_LOG_LEVEL: level = 'info',
     },
     func: {
-      app,
+      app: appName,
     },
     log,
   } = context;
 
-  if (!event?.awslogs?.data) {
-    log.info('No AWS logs payload in event');
-    return new Response('', { status: 204 });
-  }
   if (!apiKey) {
     const msg = 'No CORALOGIX_API_KEY set';
     log.error(msg);
@@ -54,13 +74,14 @@ async function run(request, context) {
   let input;
 
   try {
-    const payload = Buffer.from(event.awslogs.data, 'base64');
-    const uncompressed = await gunzip(payload);
-    input = JSON.parse(uncompressed.toString());
-    log.info(`Received ${input.logEvents.length} event(s) for [${input.logGroup}][${input.logStream}]`);
+    input = await getInput(request, context);
+    if (input === null) {
+      log.info('No AWS logs payload in event');
+      return new Response('', { status: 204 });
+    }
 
     const [,,, funcName] = input.logGroup.split('/');
-    const [, funcVersion] = input.logStream.match(/\d{4}\/\d{2}\/\d{2}\/\[(\d+|\$LATEST)\]\w+/);
+    const [, funcVersion] = input.logStream.match(/\d{4}\/\d{2}\/\d{2}\/[a-z-]*\[(\d+|\$LATEST)\]\w+/);
 
     let alias;
     if (funcVersion !== '$LATEST') {
@@ -71,13 +92,22 @@ async function run(request, context) {
     // Use mapped subsystem if available, else fallback to default
     const subsystem = mapSubsystem(alias ?? funcVersion, context) || defaultSubsystem;
 
-    const logger = new CoralogixLogger(
+    const logger = new CoralogixLogger({
       apiKey,
-      `/${packageName}/${serviceName}/${alias ?? funcVersion}`,
-      app,
-      { level, logStream: input.logStream, subsystem },
-    );
-    await logger.sendEntries(input.logEvents);
+      funcName: `/${packageName}/${serviceName}/${alias ?? funcVersion}`,
+      appName,
+      computerName,
+      log,
+      apiUrl,
+      level,
+      logStream: input.logStream,
+      subsystem,
+    });
+    const { rejected, sent } = await logger.sendEntries(input.logEvents);
+    log.info(`Received ${input.logEvents.length} event(s) for [${input.logGroup}][${input.logStream}], sent: ${sent}`);
+    if (rejected.length) {
+      await sendToDLQ(context, rejected);
+    }
     return new Response('', { status: 202 });
   } catch (e) {
     log.error(e.message);
@@ -89,6 +119,9 @@ async function run(request, context) {
       log.error(`Unable to send to DLQ: ${e2.message}`);
     }
     throw e;
+    /* c8 ignore next 3 */
+  } finally {
+    resetConnections();
   }
 }
 

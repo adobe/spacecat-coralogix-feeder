@@ -9,13 +9,23 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { context, h1 } from '@adobe/fetch';
+import { DevelopmentServer } from '@adobe/helix-universal-devserver';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-/* c8 ignore next 7 */
-export const fetchContext = process.env.HELIX_FETCH_FORCE_HTTP1
-  ? h1({
-    userAgent: 'adobe-fetch', // static user-agent for recorded tests
-  })
-  : context({
-    userAgent: 'adobe-fetch', // static user-agent for recorded tests
-  });
+import { main } from '../../src/index.js';
+
+// eslint-disable-next-line no-underscore-dangle
+global.__rootdir = resolve(fileURLToPath(import.meta.url), '..', '..', '..');
+
+async function run() {
+  process.env.HLX_DEV_SERVER_HOST = 'localhost:3000';
+  process.env.HLX_DEV_SERVER_SCHEME = 'http';
+  const devServer = await new DevelopmentServer(main)
+    .withPort(3000)
+    .withXFH('')
+    .init();
+  await devServer.start();
+}
+
+run().then(process.stdout).catch(process.stderr);
