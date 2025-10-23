@@ -1,8 +1,8 @@
 {
   "name": "@adobe/spacecat-coralogix-feeder",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Spacecat Coralogix Feeder",
+  "description": "Spacecat Coralogix Feeder, based on helix-coralogix-feeder-1.4.0",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
