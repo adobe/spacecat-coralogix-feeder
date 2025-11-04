@@ -14,6 +14,7 @@ import zlib from 'zlib';
 import { Response } from '@adobe/fetch';
 import wrap from '@adobe/helix-shared-wrap';
 import { helixStatus } from '@adobe/helix-status';
+import { logWrapper } from '@adobe/spacecat-shared-utils';
 import { CoralogixLogger } from './coralogix.js';
 import { resolve } from './alias.js';
 import { sendToDLQ } from './dlq.js';
@@ -62,12 +63,12 @@ async function run(request, context) {
     func: {
       app: appName,
     },
-    log,
+    contextualLog,
   } = context;
 
   if (!apiKey) {
     const msg = 'No CORALOGIX_API_KEY set';
-    log.error(msg);
+    contextualLog.error(msg);
     return new Response(msg, { status: 500 });
   }
 
@@ -76,7 +77,7 @@ async function run(request, context) {
   try {
     input = await getInput(request, context);
     if (input === null) {
-      log.info('No AWS logs payload in event');
+      contextualLog.info('No AWS logs payload in event');
       return new Response('', { status: 204 });
     }
 
@@ -97,26 +98,26 @@ async function run(request, context) {
       funcName: `/${packageName}/${serviceName}/${alias ?? funcVersion}`,
       appName,
       computerName,
-      log,
+      log: contextualLog,
       apiUrl,
       level,
       logStream: input.logStream,
       subsystem,
     });
     const { rejected, sent } = await logger.sendEntries(input.logEvents);
-    log.info(`Received ${input.logEvents.length} event(s) for [${input.logGroup}][${input.logStream}], sent: ${sent}`);
+    contextualLog.info(`Received ${input.logEvents.length} event(s) for [${input.logGroup}][${input.logStream}], sent: ${sent}`);
     if (rejected.length) {
       await sendToDLQ(context, rejected);
     }
     return new Response('', { status: 202 });
   } catch (e) {
-    log.error(e.message);
-    log.debug('Unexpected problem', e);
+    contextualLog.error(e.message);
+    contextualLog.debug('Unexpected problem', e);
 
     try {
       await sendToDLQ(context, input ?? { data: event.awslogs.data });
     } catch (e2) {
-      log.error(`Unable to send to DLQ: ${e2.message}`);
+      contextualLog.error(`Unable to send to DLQ: ${e2.message}`);
     }
     throw e;
     /* c8 ignore next 3 */
@@ -126,4 +127,5 @@ async function run(request, context) {
 }
 
 export const main = wrap(run)
+  .with(logWrapper)
   .with(helixStatus);
