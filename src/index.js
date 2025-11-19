@@ -63,12 +63,12 @@ async function run(request, context) {
     func: {
       app: appName,
     },
-    contextualLog,
+    log,
   } = context;
 
   if (!apiKey) {
     const msg = 'No CORALOGIX_API_KEY set';
-    contextualLog.error(msg);
+    log.error(msg);
     return new Response(msg, { status: 500 });
   }
 
@@ -77,7 +77,7 @@ async function run(request, context) {
   try {
     input = await getInput(request, context);
     if (input === null) {
-      contextualLog.info('No AWS logs payload in event');
+      log.info('No AWS logs payload in event');
       return new Response('', { status: 204 });
     }
 
@@ -98,26 +98,26 @@ async function run(request, context) {
       funcName: `/${packageName}/${serviceName}/${alias ?? funcVersion}`,
       appName,
       computerName,
-      log: contextualLog,
+      log,
       apiUrl,
       level,
       logStream: input.logStream,
       subsystem,
     });
     const { rejected, sent } = await logger.sendEntries(input.logEvents);
-    contextualLog.info(`Received ${input.logEvents.length} event(s) for [${input.logGroup}][${input.logStream}], sent: ${sent}`);
+    log.info(`Received ${input.logEvents.length} event(s) for [${input.logGroup}][${input.logStream}], sent: ${sent}`);
     if (rejected.length) {
       await sendToDLQ(context, rejected);
     }
     return new Response('', { status: 202 });
   } catch (e) {
-    contextualLog.error(e.message);
-    contextualLog.debug('Unexpected problem', e);
+    log.error(e.message);
+    log.debug('Unexpected problem', e);
 
     try {
       await sendToDLQ(context, input ?? { data: event.awslogs.data });
     } catch (e2) {
-      contextualLog.error(`Unable to send to DLQ: ${e2.message}`);
+      log.error(`Unable to send to DLQ: ${e2.message}`);
     }
     throw e;
     /* c8 ignore next 3 */
