@@ -14,6 +14,7 @@ import zlib from 'zlib';
 import { Response } from '@adobe/fetch';
 import wrap from '@adobe/helix-shared-wrap';
 import { helixStatus } from '@adobe/helix-status';
+import { logWrapper } from '@adobe/spacecat-shared-utils';
 import { CoralogixLogger } from './coralogix.js';
 import { resolve } from './alias.js';
 import { sendToDLQ } from './dlq.js';
@@ -126,4 +127,5 @@ async function run(request, context) {
 }
 
 export const main = wrap(run)
+  .with(logWrapper)
   .with(helixStatus);
